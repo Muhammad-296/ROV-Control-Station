@@ -1,0 +1,26 @@
+name: Python checks
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+      - '.github/workflows/python-checks.yml'
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-and-protocol:
+    name: Syntax and protocol tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Python source (syntax)
+        run: python -m py_compile ROV_Control_Station_Integrated.py test_protocol.py
+      - name: Run isolated protocol tests (no motors)
+        run: python test_protocol.py

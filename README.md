@@ -22,7 +22,7 @@
 [![Platform](https://img.shields.io/badge/Desktop-Windows-0067B8?style=flat-square&logo=windows)](#quick-start)
 [![GitHub](https://img.shields.io/badge/Maintainer-Muhammad--296-333333?style=flat-square&logo=github)](https://github.com/Muhammad-296)
 
-**[Explore features](#capabilities)** · **[Get started](#quick-start)** · **[Wiring](#hardware--wiring)** · **[Motor testing](#motor-test-station)** · **[Safety](#safety-notice)**
+**[Features](#capabilities)** · **[Get started](#quick-start)** · **[Architecture](docs/ARCHITECTURE.md)** · **[Engineering handbook](docs/ENGINEERING_GUIDE.md)** · **[Hardware validation](docs/HARDWARE_VALIDATION.md)** · **[Troubleshooting](docs/TROUBLESHOOTING.md)**
 
 </div>
 
@@ -71,6 +71,22 @@ flowchart LR
 ```
 
 > The architecture diagram shows intended component connections, not proof of validated electrical wiring. Match the firmware pin map to your assembled system.
+
+## Engineering resources & continuous integration
+
+[![Python protocol checks](https://github.com/Muhammad-296/ROV-Control-Station/actions/workflows/python-checks.yml/badge.svg)](https://github.com/Muhammad-296/ROV-Control-Station/actions/workflows/python-checks.yml)
+[![Arduino Mega compile](https://github.com/Muhammad-296/ROV-Control-Station/actions/workflows/arduino-compile.yml/badge.svg)](https://github.com/Muhammad-296/ROV-Control-Station/actions/workflows/arduino-compile.yml)
+
+> Status badges report automated workflow results **after** GitHub Actions has run. Passing automation is not evidence of successful hardware operation.
+
+| Resource | Description |
+|:--|:--|
+| [Architecture](docs/ARCHITECTURE.md) | Mermaid block, communications and safety state diagrams, editable in GitHub Markdown |
+| [Engineering guide](docs/ENGINEERING_GUIDE.md) | Components, signal wiring, firmware and GUI responsibilities, calibration, operations |
+| [Serial protocol](docs/PROTOCOL.md) | V5 messages, mode rules, acknowledgments and telemetry |
+| [Hardware validation](docs/HARDWARE_VALIDATION.md) | Owner-reported testing with blank, reproducible acceptance records |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Connection, motor, telemetry, camera and build diagnostics |
+| [CI guide](docs/CI_GUIDE.md) | What the Python and Arduino workflows verify—and what they cannot |
 
 ## Quick start
 

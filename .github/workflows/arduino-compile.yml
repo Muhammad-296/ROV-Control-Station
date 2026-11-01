@@ -1,0 +1,26 @@
+name: Arduino Mega compile
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ROV_Mega_Integrated/**'
+      - '.github/workflows/arduino-compile.yml'
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-mega:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install AVR board core and libraries
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+          arduino-cli lib install OneWire
+          arduino-cli lib install DallasTemperature
+      - name: Compile firmware for Arduino Mega 2560
+        run: arduino-cli compile --fqbn arduino:avr:mega ROV_Mega_Integrated
