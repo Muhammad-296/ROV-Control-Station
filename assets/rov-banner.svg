@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="350" viewBox="0 0 1200 350" role="img" aria-label="ROV Control Station banner">
+<defs>
+ <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#061729"/><stop offset="1" stop-color="#093a4c"/></linearGradient>
+ <linearGradient id="blue" x2="1" y2="0"><stop stop-color="#65f1df"/><stop offset="1" stop-color="#55aaff"/></linearGradient>
+ <pattern id="grid" width="35" height="35" patternUnits="userSpaceOnUse"><path d="M35 0H0V35" fill="none" stroke="#5bded2" stroke-opacity=".11" stroke-width="1"/></pattern>
+</defs>
+<rect width="1200" height="350" rx="22" fill="url(#bg)"/><rect width="1200" height="350" rx="22" fill="url(#grid)"/>
+<circle cx="990" cy="170" r="132" stroke="#57d7d6" fill="none" stroke-opacity=".2" stroke-width="2"/><circle cx="990" cy="170" r="94" stroke="#57d7d6" fill="none" stroke-opacity=".3"/><circle cx="990" cy="170" r="47" stroke="#57d7d6" fill="none" stroke-opacity=".28"/>
+<path d="M990 27V312M845 170H1138" stroke="#57d7d6" stroke-opacity=".16"/><path d="M990 170L1100 100A132 132 0 0 0 1000 38Z" fill="#45dfc8" opacity=".1"/>
+<path d="M915 154L947 133H1037L1070 154V194L1037 215H947L915 194Z" fill="#102f48" stroke="url(#blue)" stroke-width="3"/><rect x="959" y="150" width="67" height="42" rx="9" fill="#0d5263" stroke="#72eadb" stroke-width="2"/><circle cx="992" cy="171" r="11" fill="#9ef7ed"/>
+<g fill="none" stroke="#72eadb" stroke-width="5"><circle cx="907" cy="139" r="17"/><circle cx="1078" cy="139" r="17"/><circle cx="907" cy="208" r="17"/><circle cx="1078" cy="208" r="17"/></g><g stroke="#72eadb" stroke-width="2"><path d="M907 124v30m-15-15h30M1078 124v30m-15-15h30M907 193v30m-15-15h30M1078 193v30m-15-15h30"/></g>
+<rect x="53" y="45" width="173" height="30" rx="15" fill="#123b50" stroke="#3bc7ce" stroke-opacity=".65"/><text x="69" y="65" fill="#aef3ed" font-family="Arial,sans-serif" font-size="14" font-weight="bold" letter-spacing="2">INTEGRATED V5</text>
+<text x="51" y="150" fill="white" font-family="Arial,sans-serif" font-size="63" font-weight="bold" letter-spacing="1">ROV CONTROL</text><text x="51" y="222" fill="url(#blue)" font-family="Arial,sans-serif" font-size="69" font-weight="bold" letter-spacing="2">STATION</text>
+<path d="M53 246H702" stroke="#49d6cf" stroke-opacity=".55"/><text x="54" y="281" fill="#c9e0ef" font-family="Arial,sans-serif" font-size="19">SIX-THRUSTER UNDERWATER ROBOTICS</text><text x="54" y="312" fill="#87becb" font-family="Arial,sans-serif" font-size="15" letter-spacing="2">MISSION CONTROL  /  SERIAL1  /  REAL-TIME TELEMETRY</text>
+</svg>
