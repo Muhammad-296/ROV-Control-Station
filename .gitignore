@@ -1,0 +1,27 @@
+# Python environments and caches
+.venv/
+venv/
+.rov_venv*/
+.rov_build_env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+# Build artifacts and large executables
+build/
+dist/
+*.exe
+*.msi
+*.log
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*credentials*
+*secrets*
+*.pem
+*.key
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
