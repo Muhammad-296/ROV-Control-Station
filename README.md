@@ -1,10 +1,14 @@
 <div align="center">
 
-<img src="assets/rov-banner.svg" alt="MESEKET Control Station — Mars Rover and ROV mission control" width="100%" />
+<img src="assets/control-station-rover-rov-banner.png" alt="Control Station — Mars rover on red terrain and an underwater ROV in blue water" width="100%" />
+
+<sub>Concept artwork for the two vehicle sections. Actual application screenshots appear below.</sub>
 
 <br />
 
-# MESEKET Control Station — Mars Rover & ROV
+# Control Station
+
+**Mars Rover + Underwater ROV**
 
 **A unified PySide6 mission-control desktop application with dedicated Mars Rover (ROS 2) and Underwater ROV (Arduino Mega V5) sections.**
 
@@ -44,6 +48,12 @@ The application boots into a unified vehicle selector (`control_station.py`) sup
 
 Launch `python control_station.py`, `RUN_GUI.bat` on Windows, or `./RUN_GUI.sh` on Ubuntu, then choose **Mars Rover** or **ROV**. The launcher also displays live environment dependency badges (`PySide6`, `OpenCV`, `Pygame`, `VTK 3D`, `ROS 2`).
 
+<div align="center">
+<img src="assets/vehicle-selector.png" alt="Control Station vehicle selector with separate Mars Rover and ROV launch cards" width="720" />
+<br />
+<sub>Actual vehicle selector. Each station has its own controls, connection settings, and status.</sub>
+</div>
+
 The selector and offline Rover dashboard require only PySide6:
 
 ```bash
@@ -66,6 +76,12 @@ Using `--system-site-packages` exposes existing ROS 2 and system dependencies wi
 ## Mars Rover section
 
 The **Mars Rover section** adapts the control station layout with a Mars red theme: top ROS 2 connection and safety bar, left manual/steering panel, centre drive/map/motor/sensor tabs, right tuning/camera/network/ROS settings, and a bottom filterable log.
+
+<div align="center">
+<img src="assets/mars-rover-dashboard.png" alt="Mars Rover dashboard showing skid-steer controls, wheel schematic, telemetry panels, and ROS settings" width="100%" />
+<br />
+<sub>Actual Mars Rover dashboard in the standalone Gazebo profile, disconnected and disarmed.</sub>
+</div>
 
 It includes an animated 4WD/4WS rover schematic, 2D SLAM/Nav2 map with ArUco and obstacle overlays, four drive motors (`D1–D4`), four steering motors (`S1–S4`), four drive encoder rows (`E1–E4`), unified ROS/RTSP camera streaming, Motor Test Station with guided 8-motor bench inspection, PS4 monitor, ROS diagnostics, and an optional 3D STL viewer (VTK). Simulation and Hardware profiles keep separate ROS topic settings. Steering encoder feedback remains deferred and is marked **Not implemented** until a hardware ROS interface publishes it.
 
@@ -92,6 +108,16 @@ The existing Gazebo rover is skid-steer: wheel angles stay fixed and steering-mo
 
 The recommended host launcher is `Autonmous_Ws/Control/scripts/run_gui_docker.sh` in the autonomous project. It runs both applications in Jazzy/Harmonic, using the dedicated GUI image and read-only source mounts. `run_gui_teleop.sh` is the entry point inside that environment. The host's Humble/Fortress installation is not used for the combined session.
 
+To drive the simulator, follow this order:
+
+1. Press **CONNECT ROS 2** and confirm telemetry arrives.
+2. Clear **E-STOP LATCHED** with **RESET LATCH**, if needed.
+3. Select **ROS 2 Teleop (/cmd_vel_manual)** under OUTPUT, then press **ARM**.
+4. Press and hold the GUI buttons or keyboard keys: **Forward/Reverse (`W/S`)**, **Turn L/Turn R (`Q/E`)** for rotation in place, or **`W/S` + Steer L/Steer R (`A/D`)** for curved travel.
+5. Under Camera, choose **ROS RGB** or **Depth**, then Connect. Release movement controls to stop; `Space`/`Esc` latches the stop.
+
+**INPUT PREVIEW** animates only the dashboard. It does not drive Gazebo. In skid-steer mode, **Steer L/R** needs forward or reverse motion; use **Turn L/R** to rotate while stationary.
+
 ### ROS 2 connection & safety gating
 
 Start the GUI from a terminal with ROS 2 sourced and a matching Python interpreter (`rclpy` + PySide6):
@@ -103,7 +129,7 @@ python3 control_station.py
 
 Select **Mars Rover**, choose **Simulation** or **Hardware** under the **ROS** tab, then press **CONNECT ROS 2**.
 
-- **Preview Only (Safe, default):** zero ROS command publishers active; keyboard/gamepad/test inputs animate only the local GUI.
+- **Preview Only (Safe, default):** no movement commands are sent; keyboard/gamepad/test inputs animate only the local GUI.
 - **ROS 2 Teleop (`/cmd_vel`):** switching **OUTPUT** to ROS 2 Teleop requires an active ROS 2 connection and explicit **ARM** before publishing `/cmd_vel` (`geometry_msgs/msg/Twist`) or `/goal_pose` (`geometry_msgs/msg/PoseStamped`).
 - **E-STOP & Watchdogs:** pressing **■ E-STOP** (or `Space` / `Esc`) immediately emits a zero-velocity burst, cancels any waypoint mission, and latches outputs until **RESET LATCH** is pressed.
 
@@ -150,9 +176,9 @@ The **ROV section** (`ROV_Control_Station_Integrated.py`) brings the underwater 
 > **Hardware status:** The project owner reports that the ROV system has been **tested with physical hardware**. Exact test conditions, acceptance criteria, duration, and underwater qualification have not been supplied. The software includes simulated protocol tests, but neither those tests nor the owner-reported hardware testing imply safety certification.
 
 <div align="center">
-<img src="assets/rov-sonar.gif" alt="Animated ROV sonar-style mission-control graphic" width="85%" />
+<img src="assets/rov-dashboard.png" alt="Underwater ROV dashboard with six thrusters, manual controls, serial connection, and camera settings" width="100%" />
 <br />
-<sub>Original animated project graphic — illustrative; not live sonar data or a GUI recording.</sub>
+<sub>Actual ROV dashboard, disconnected and disarmed. Thruster graphics represent commands; they are not measured thrust.</sub>
 </div>
 
 ### Capabilities
@@ -323,8 +349,13 @@ ROV-Control-Station/
 ├── ROV_Mega_Integrated/
 │   └── ROV_Mega_Integrated.ino          # Matching Mega firmware V5 (ROV)
 ├── assets/
-│   ├── rov-banner.svg                   # Designed GitHub banner
-│   └── rov-sonar.gif                    # Original animated visual
+│   ├── control-station-rover-rov-banner.png # Combined rover + ROV concept artwork
+│   ├── vehicle-selector.png             # Actual selector screenshot
+│   ├── mars-rover-dashboard.png         # Actual rover screenshot
+│   ├── rov-dashboard.png                # Actual ROV screenshot
+│   ├── README.md                        # Image provenance and generation prompts
+│   ├── rov-banner.svg                   # Earlier banner, retained
+│   └── rov-sonar.gif                    # Earlier illustrative animation, retained
 ├── models/
 │   └── ROV Assembly_Fully.STL           # 3D model
 ├── docs/                                # Architecture, protocol, CI & validation guides
@@ -348,6 +379,7 @@ ROV-Control-Station/
 | :-- | :-- |
 | **ROV physical hardware operation** | **Tested — as confirmed by the project owner** |
 | **Mars Rover software & ROS parsers** | **Unit, mock ROS & offscreen Qt tests included (`test_rover_gui.py`)** |
+| **Mars Rover Gazebo integration** | Jazzy/Harmonic Docker checked for movement, four wheel RPM readings, IMU/pose, RGB/depth, and command timeout; CAN/STM32 and steering remain future work |
 | **Desktop Python syntax** | Checked with `py_compile` across all `.py` files |
 | **ROV protocol/state behavior** | Synthetic tests included (`test_protocol.py`) |
 | **Live field endurance & waterproofing** | Not documented in this repository |
@@ -387,7 +419,7 @@ Hardware evidence (photos, videos, test logs, acceptance metrics) can be added l
 
 ## Credits & licensing
 
-**Maintainer:** [Muhammad-296](https://github.com/Muhammad-296) · **Project:** MESEKET Control Station (Mars Rover & ROV) · **Stack:** Python / PySide6 / ROS 2 / Arduino / VTK / OpenCV / pygame.
+**Maintainer:** [Muhammad-296](https://github.com/Muhammad-296) · **Project:** Control Station (Mars Rover & ROV) · **Stack:** Python / PySide6 / ROS 2 / Arduino / VTK / OpenCV / pygame.
 
 The GUI source includes attribution for a DualShock 4 photograph by **ITEagle Europe / Sebastiaan Broekhoven**, licensed **CC BY-SA 4.0**; refer to the GUI source header for the original link and requirements.
 
@@ -399,6 +431,6 @@ The GUI source includes attribution for a DualShock 4 photograph by **ITEagle Eu
 
 **ENGINEERED FOR OBSERVABILITY · BUILT FOR CONTROL · MARS ROVER & ROV**
 
-[Back to top ↑](#meseket-control-station--mars-rover--rov)
+[Back to top ↑](#control-station)
 
 </div>

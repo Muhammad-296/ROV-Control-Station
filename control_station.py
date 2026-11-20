@@ -1,4 +1,4 @@
-"""Cross-platform MESEKET vehicle selector for Mars Rover and ROV control stations."""
+"""Cross-platform vehicle selector for Mars Rover and ROV control stations."""
 
 import argparse
 import importlib.util
@@ -34,7 +34,7 @@ class VehicleSelector(QWidget):
         super().__init__()
         self.setObjectName("selectorRoot")
         self.setStyleSheet(SELECTOR_QSS)
-        self.setWindowTitle("MESEKET Control Station")
+        self.setWindowTitle("Control Station")
         self.resize(720, 420)
         self.setMinimumSize(620, 360)
         self.rover: RoverDashboard | None = None
@@ -50,7 +50,7 @@ class VehicleSelector(QWidget):
 
         header = QVBoxLayout()
         header.setSpacing(4)
-        title = QLabel(f"MESEKET <span style='color:{ACCENT}'>CONTROL STATION</span>")
+        title = QLabel(f"<span style='color:{ACCENT}'>CONTROL STATION</span>")
         title.setObjectName("selectorTitle")
         sub = QLabel("Select a vehicle station. Each vehicle keeps independent settings and safety interlocks.")
         sub.setObjectName("selectorSub")

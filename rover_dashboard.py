@@ -141,7 +141,7 @@ class RoverDashboard(QMainWindow):
 
         setup_fonts(QApplication.instance())
         self.setStyleSheet(ROVER_QSS)
-        self.setWindowTitle("MESEKET · Mars Rover Control Station")
+        self.setWindowTitle("Control Station · Mars Rover")
         self.resize(1600, 960)
 
         central = QWidget()
@@ -1828,7 +1828,7 @@ class RoverDashboard(QMainWindow):
         self.steering_note.setText("Gazebo wheels are fixed. Turning uses different left/right wheel speeds.")
         self.rover_view.fixed_steering = True
         self.output_mode_combo.setItemText(1, "ROS 2 Teleop (/cmd_vel_manual)")
-        self.setWindowTitle("Mars Rover · Gazebo skid-steer teleop")
+        self.setWindowTitle("Control Station · Gazebo skid-steer teleop")
         self.setup_status.setText("Standalone Gazebo: /odom, fixed steering, manual commands via timeout guard. Nav2 is off.")
         self._sync_safety_ui()
         self.log_event("INFO", "Gazebo teleop profile loaded. CONNECT ROS 2, select ROS Teleop, then ARM. Camera: select ROS RGB or Depth and Connect.")
