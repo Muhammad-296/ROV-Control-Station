@@ -118,15 +118,15 @@ The system-site-packages option also exposes existing ROS/system dependencies.
 The launcher uses this environment when present; global Python packages are not
 changed.
 
-Rover mode uses the ROV's layout and shared visual components with a restrained
-Mars red theme: top connection
-and safety bar, left manual controls, centre vehicle/sensor tabs, right settings
-and bottom log. It includes a rover schematic, four drive motors, four steering
-motors, four drive encoder rows, a camera view, PS4 monitor and optional STL viewer
-(requires VTK). Simulation and Hardware profiles keep separate ROS topic settings.
-The four steering motors remain visible, with feedback marked **Not implemented**.
-Steering encoder integration is deferred; the current ROS stack supplies drive
-encoders only. The GUI does not change the older skid-steer controller/model.
+Rover mode matches the ROV's layout and shared visual components with a Mars red
+theme: top connection/safety bar, left manual controls, centre vehicle/map/sensor
+tabs, right settings, and bottom filterable log. It includes an animated 4WD/4WS
+rover schematic, 2D SLAM/Nav2 map with ArUco and obstacle overlays, four drive
+motors, four steering motors, four drive encoder rows, unified ROS/RTSP camera
+streaming, Motor Test Station with guided 8-motor inspection, PS4 monitor, ROS
+diagnostics, and optional 3D STL viewer (VTK). Simulation and Hardware profiles
+keep separate ROS topic settings. Steering encoder feedback remains deferred and
+is clearly marked **Not implemented** until a hardware ROS interface publishes it.
 
 | Wheel | Drive / encoder | Steering (feedback deferred) |
 | :-- | :-- | :-- |
@@ -135,68 +135,50 @@ encoders only. The GUI does not change the older skid-steer controller/model.
 | Rear left | D3 / E3 | S3 |
 | Rear right | D4 / E4 | S4 |
 
-**Read-only ROS 2 connection:** start the GUI from an environment with ROS 2
-sourced and a matching Python interpreter that can import `rclpy` and PySide6.
-For example, on the existing Ubuntu/Jazzy setup:
+**ROS 2 connection & safety gating:** start the GUI from an environment with
+ROS 2 sourced and a matching Python interpreter (`rclpy` + PySide6):
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 python3 control_station.py
 ```
 
-Select **Mars Rover**, choose the profile/source under **ROS / Camera**, then
-press **CONNECT ROS 2**. The laptop and rover need matching `ROS_DOMAIN_ID`
-settings and ROS discovery/network access. Without ROS installed, the dashboard
-still opens; connection failure is reported in the rover log. Windows live
-telemetry requires its own compatible ROS 2 Python environment; no network
-bridge is bundled in this version.
+Select **Mars Rover**, choose **Simulation** or **Hardware** under **ROS**, then
+press **CONNECT ROS 2**. By default, **OUTPUT** starts in **Preview Only (Safe)**
+(zero ROS publishers active). Switching **OUTPUT** to **ROS 2 Teleop (`/cmd_vel`)**
+requires connecting ROS 2 and pressing **ARM** before publishing `/cmd_vel`
+(`geometry_msgs/msg/Twist`) or `/goal_pose` (`geometry_msgs/msg/PoseStamped`).
+Pressing **■ E-STOP** (or `Space` / `Esc`) immediately sends a zero-velocity
+burst, cancels any waypoint mission, and latches outputs until **RESET LATCH**
+is pressed.
 
-| Source | Topics | Conversion |
-| :-- | :-- | :-- |
-| Simulation / Joint states | `/joint_states_gz` (`sensor_msgs/msg/JointState`) | Joint velocity rad/s → RPM; if absent, derive speed from consecutive stamped positions |
-| Hardware / Ticks and wheel speeds | `/wheel/ticks` (`std_msgs/msg/Int64MultiArray`), `/wheel/per_wheel_speeds` (`std_msgs/msg/Float64MultiArray`) | Counts shown directly; wheel speed m/s → RPM using configured wheel radius |
-| Orientation | `/imu/data` (`sensor_msgs/msg/Imu`) | Quaternion → roll, pitch and heading |
+| Subsystem | Default Topic (Simulation / Hardware) | Message Type | Purpose |
+| :-- | :-- | :-- | :-- |
+| Drive joint states | `/joint_states_gz` / `/joint_states` | `sensor_msgs/msg/JointState` | Joint rad/s → RPM (or position differentiation) |
+| Drive ticks | `/wheel/ticks` or `/wheel/ticks/{wheel}` | `std_msgs/msg/Int64MultiArray` / `Int64` | Raw encoder tick counts (`FL, FR, RL, RR`) |
+| Wheel speeds | `/wheel/per_wheel_speeds` | `std_msgs/msg/Float64MultiArray` | Wheel linear speeds (m/s) → RPM |
+| Orientation / IMU | `/imu/data` | `sensor_msgs/msg/Imu` | Attitude, gyro (°/s), accel (g) |
+| EKF Pose & Speed | `/odometry/filtered` | `nav_msgs/msg/Odometry` | Rover `(X, Y, Yaw)` and speed (m/s) |
+| Slip monitor | `/wheel/slip_detected`, `/wheel/single_wheel_slip` | `std_msgs/msg/Bool` | Slip warning indicators |
+| SLAM Map & Nav2 Plan | `/map`, `/plan` | `OccupancyGrid`, `Path` | Live 2D map and global route |
+| Perception | `/perception/aruco_pose`, `/perception/obstacles_only` | `PoseStamped`, `Detection3DArray` | Landmark and 3D obstacle map overlays |
+| Cameras | `/camera/image_raw`, `/camera/depth/image_raw`, `/marker_detection/*` | `sensor_msgs/msg/Image` | On-demand RGB, colorized depth, and ArUco debug feeds |
+| Diagnostics | `/slam/encoder_diagnostics`, `/slam/slip_diagnostics` | `diagnostic_msgs/msg/DiagnosticArray` | Node health and topic Hz rates |
+| Gated Commands | `/cmd_vel`, `/goal_pose` | `Twist`, `PoseStamped` | Published only when ARMED in ROS 2 Teleop mode |
 
-Drive array order follows the encoder node's default: **FL, FR, RL, RR**.
-Simulation joint matching uses `left_front_wheel_joint`, `right_front_wheel_joint`,
-`left_rear_wheel_joint`, `right_rear_wheel_joint` and their front/rear aliases.
-Raw ticks are not fabricated from simulated joint positions. Missing fields show
-`--`; ticks and speed each expire independently after two seconds. Hardware
-speed conversion defaults to the encoder configuration's 0.06 m wheel radius;
-set it to the actual value used by your encoder node. Custom `wheel_names` array
-orders and individual tick topics are not supported by this GUI adapter yet.
+**Operator controls, map & inspection:**
+- **Manual / Joystick:** `W/S` drive, `A/D` steer, `Q/E` turn, `Space` / `Esc` stop; supports Coordinated, Crab, and Turn-in-Place 4WS kinematics with trajectory preview.
+- **Navigation / Map:** interactive zoom/pan 2D SLAM map, Follow Rover mode, waypoint queue with JSON save/load and auto-advance when armed.
+- **Motor Test Station:** detached window (`1–4` drive, `5–8` steering preview) with common sliders, reverse toggle, live RPM readouts, and an 8-step guided inspection checklist with CSV export.
+- **Camera:** unified switcher between ROS 2 RGB, colorized Depth, ArUco/Pose debug images, and Direct RTSP (anonymous or authenticated, never auto-connects on view toggle) with detached fullscreen monitor (`F11`) and PNG snapshots.
+- **Sensors & Telemetry Black-Box:** live 3-column IMU HUD with **Zero yaw**, Subsystem Health Matrix, topic Hz monitor, and unified telemetry CSV recording (pose, IMU, 4-wheel ticks/RPM, slip state).
 
-**Operator controls and animation:** enable **INPUT PREVIEW** for local keyboard
-or gamepad control of the animated rover. W/S moves the wheel preview, A/D steers,
-Q/E turns; Space stops and disables preview, and Esc exits preview. Coordinated,
-crab and turn-in-place modes change the simulated wheel arrangement. Wheel
-treads, steering pivots, command bars, joystick trails and tab fades animate;
-the actual ROS measurements remain separate from preview values. Power, expo,
-deadzone, smoothing and joystick axis/inversion settings are saved locally.
-
-**Motor Test Station:** open the separate window and enable INPUT PREVIEW.
-Hold 1–4 for drive channels or 5–8 for steering channels; releasing stops the
-selected preview. Each channel has its own level, inversion and hold buttons.
-Only one channel previews at a time. Changing window focus clears held input.
-
-**Camera:** the Camera settings tab offers RTSP host, port, path, credentials and
-TCP/UDP selection, plus connect/stop, a separate monitor, fullscreen and snapshots.
-It uses the ROV's existing OpenCV capture worker. The centre view can switch
-between the rover schematic and camera. Credentials are entered each session
-and are never saved. Connecting is explicit; opening the dashboard or monitor
-does not access the camera. Camera streaming requires OpenCV.
-
-**Sensors:** attitude, gyro and acceleration plots offer pause, clear, time
-window selection and received-sample CSV recording. Drive encoder snapshots
-can also be exported as CSV. PS4 Monitor now displays actual local controller
-inputs when pygame and a controller are available.
-
-Physical motor commands, arming, hardware E-STOP/reset, auxiliary outputs,
-battery and navigation telemetry are not connected in Rover mode. Their controls
-remain unavailable or show unknown data. Preview is never sent to ROS or motor
-hardware. Steering encoder readings remain deferred. Map and other unused topic
-fields are retained for later connections. ROV controls and colours retain their
-existing defaults; shared drawing widgets only gained optional accent arguments.
+**Verification:**
+```bash
+.venv/bin/python -m py_compile *.py
+.venv/bin/python test_protocol.py
+QT_QPA_PLATFORM=offscreen .venv/bin/python test_rover_gui.py
+```
 
 ROV mode launches the original application in a separate process using the
 same Python environment. Closing either vehicle window returns to the selector.
