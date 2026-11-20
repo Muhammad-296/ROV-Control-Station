@@ -90,6 +90,33 @@ flowchart LR
 
 ## Quick start
 
+### Rover / ROV selector (Windows and Ubuntu)
+
+Launch `python control_station.py`, `RUN_GUI.bat` on Windows, or
+`bash RUN_GUI.sh` on Ubuntu. Choose **Mars Rover** or **ROV** at startup.
+The selector and offline Rover dashboard require only PySide6:
+
+```bash
+python -m pip install "PySide6>=6.7,<7"
+python control_station.py
+```
+
+On Ubuntu, use `python3` in an activated virtual environment. For ROV mode,
+install the full `requirements.txt` dependencies as described below.
+
+Rover mode currently provides navigation, camera/perception and health panels,
+plus locally saved ROS topic settings with separate Simulation and Hardware
+profiles. It does **not** connect to ROS, receive telemetry, stream cameras or
+send movement commands yet. Motion and stop buttons are disabled. The next
+integration is a rover communication backend with command ownership and stop
+acknowledgement before enabling driving.
+
+ROV mode launches the original application in a separate process using the
+same Python environment. Closing either vehicle window returns to the selector.
+The original ROV Python entry point, dedicated `START_ROV_*` launchers, firmware,
+settings and executable build scripts remain ROV-only and unchanged. The new
+selector is a Python source launcher; existing EXE builds do not include it.
+
 ### 1 — Requirements
 
 - **Windows + Python 3.12** for the documented GUI workflow.

@@ -2,8 +2,8 @@
 setlocal
 cd /d "%~dp0"
 if exist ".venv\Scripts\python.exe" (
-  ".venv\Scripts\python.exe" "ROV_Control_Station_Integrated.py"
+  ".venv\Scripts\python.exe" "control_station.py"
 ) else (
-  py -3.12 "ROV_Control_Station_Integrated.py"
+  py -3.12 "control_station.py"
 )
 if errorlevel 1 pause
