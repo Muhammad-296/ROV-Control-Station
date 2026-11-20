@@ -1,5 +1,6 @@
 # Python 3.12 recommended; PySide6 ONLY, not PyQt6.
-PySide6>=6.7,<7
+# 6.12.0 over-releases None/True on Python 3.10/3.11 during Qt calls.
+PySide6>=6.7,!=6.12.0,<7
 pygame>=2.5,<3
 opencv-python-headless>=4.10,<5
 numpy>=1.26,<3

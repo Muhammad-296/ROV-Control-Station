@@ -97,12 +97,26 @@ Launch `python control_station.py`, `RUN_GUI.bat` on Windows, or
 The selector and offline Rover dashboard require only PySide6:
 
 ```bash
-python -m pip install "PySide6>=6.7,<7"
+python -m pip install "PySide6>=6.7,!=6.12.0,<7"
 python control_station.py
 ```
 
 On Ubuntu, use `python3` in an activated virtual environment. For ROV mode,
 install the full `requirements.txt` dependencies as described below.
+
+If Python 3.10/3.11 exits with `none_dealloc: deallocating None`, check the
+PySide6 version. Version 6.12.0 has a reference-counting defect; it is excluded
+from the requirements. Use a project environment with the known working 6.11.2:
+
+```bash
+python3 -m venv --system-site-packages .venv
+.venv/bin/python -m pip install "PySide6==6.11.2"
+./RUN_GUI.sh
+```
+
+The system-site-packages option also exposes existing ROS/system dependencies.
+The launcher uses this environment when present; global Python packages are not
+changed.
 
 Rover mode uses the ROV's layout and shared visual components: top connection
 and safety bar, left manual controls, centre vehicle/sensor tabs, right settings
