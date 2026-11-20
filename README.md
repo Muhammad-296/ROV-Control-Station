@@ -76,6 +76,22 @@ It includes an animated 4WD/4WS rover schematic, 2D SLAM/Nav2 map with ArUco and
 | Rear left | D3 / E3 | S3 |
 | Rear right | D4 / E4 | S4 |
 
+### Standalone Gazebo teleop (Control Phase 1)
+
+The autonomous project's `Autonmous_Ws/Control/README.md` and `CONTROL_PLAN.md` define the GUI-first rollout, followed by command arbitration, Jetson/CAN/STM32 control, payloads, and later steering.
+
+With the existing simulator and `teleop_guard.py` running in a compatible ROS environment, open this GUI directly with:
+
+```bash
+.venv/bin/python control_station.py --gazebo-teleop
+```
+
+This session-only profile uses measured `/joint_states_gz` RPM, `/imu/data`, Gazebo `/odom`, `/camera/image_raw`, and `/camera/depth/image_raw`. Manual commands go to `/cmd_vel_manual`; the Control guard alone forwards bounded commands to `/cmd_vel` and stops on timeout. The GUI also zeros setpoints if UI updates stop. Start disconnected/disarmed, press CONNECT ROS 2, select ROS Teleop output, and ARM. Under Camera, select ROS RGB or Depth and Connect.
+
+The existing Gazebo rover is skid-steer: wheel angles stay fixed and steering-mode selection is disabled. Navigation, maps, perception, slip diagnostics, steering feedback and payload controls are not launched in this session. Individual motor-test inputs remain local preview; they do not drive single Gazebo motors. Do not run Nav2 or another teleop publisher in this standalone session. Saved topic profiles remain unchanged.
+
+The recommended host launcher is `Autonmous_Ws/Control/scripts/run_gui_docker.sh` in the autonomous project. It runs both applications in Jazzy/Harmonic, using the dedicated GUI image and read-only source mounts. `run_gui_teleop.sh` is the entry point inside that environment. The host's Humble/Fortress installation is not used for the combined session.
+
 ### ROS 2 connection & safety gating
 
 Start the GUI from a terminal with ROS 2 sourced and a matching Python interpreter (`rclpy` + PySide6):

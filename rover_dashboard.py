@@ -93,6 +93,7 @@ class RoverDashboard(QMainWindow):
         super().__init__()
         self.settings = QSettings("MESEKET", "MarsRoverStation")
         self.safety = SafetyController()
+        self.gazebo_teleop = False
 
         self.readings: dict[str, dict] = {}
         self.ros_link: RoverRosLink | None = None
@@ -235,6 +236,7 @@ class RoverDashboard(QMainWindow):
         actions = QHBoxLayout()
         actions.setSpacing(6)
         sub = QLabel("4WD+4WS · steering deferred")
+        self.drivetrain_label = sub
         sub.setStyleSheet("color:#9aaabe;")
         actions.addWidget(sub)
         actions.addStretch()
@@ -337,6 +339,7 @@ class RoverDashboard(QMainWindow):
         layout.addWidget(manual)
 
         steering = QGroupBox("Four-wheel steering")
+        self.steering_group = steering
         form = QFormLayout(steering)
         self.steering_mode = QComboBox()
         self.steering_mode.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -345,7 +348,8 @@ class RoverDashboard(QMainWindow):
         centre = self._btn("Centre steering / zero")
         centre.clicked.connect(self.clear_inputs)
         form.addRow(centre)
-        form.addRow(message("Steering feedback is deferred; wheel angles are simulated."))
+        self.steering_note = message("Steering feedback is deferred; wheel angles are simulated.")
+        form.addRow(self.steering_note)
         layout.addWidget(steering)
 
         aux = QGroupBox("Auxiliary outputs")
@@ -1042,7 +1046,7 @@ class RoverDashboard(QMainWindow):
             button.setEnabled(controls_active)
 
         if hasattr(self, "map_panel"):
-            self.map_panel.set_goal_allowed(self.safety.can_publish_ros())
+            self.map_panel.set_goal_allowed(self.safety.can_publish_ros() and not self.gazebo_teleop)
 
     def clear_inputs(self):
         self.keys.clear()
@@ -1318,6 +1322,14 @@ class RoverDashboard(QMainWindow):
                 drive, steer, turn, mode, self.speed_limit.value(), self.yaw_limit.value(), power_pct
             )
 
+        if self.gazebo_teleop:
+            # Gazebo currently has fixed steering and differential wheel speeds.
+            steering = dict.fromkeys(WHEELS, 0.0)
+            turning_radius = vx / wz if abs(wz) > 1e-6 else None
+            left, right = vx - wz * 0.49 / 2, vx + wz * 0.49 / 2
+            scale = max(self.speed_limit.value(), abs(left), abs(right), 0.001)
+            wheel_drive = {w: 100 * (left if w.endswith("L") else right) / scale for w in WHEELS}
+
         # Gated ROS /cmd_vel publish
         if self.ros_link is not None:
             if self.safety.can_publish_ros():
@@ -1505,6 +1517,9 @@ class RoverDashboard(QMainWindow):
             self.ros_link.set_active_camera_feed(feed_key)
 
     def send_nav_goal(self, x: float, y: float, yaw_rad: float):
+        if self.gazebo_teleop:
+            self.log_event("WARN", "Standalone Gazebo teleop does not run Nav2. Navigation goals are disabled.")
+            return
         if not self.safety.can_publish_ros() or self.ros_link is None:
             self.log_event("WARN", "Ignored Nav2 goal: rover must be connected, in ROS 2 Teleop mode, and ARMED.")
             return
@@ -1539,7 +1554,8 @@ class RoverDashboard(QMainWindow):
         for plot in self.imu_plots:
             plot.clear()
 
-        self.ros_link = RoverRosLink(topics, self.encoder_source.currentText(), self.wheel_radius.value(), self)
+        self.ros_link = RoverRosLink(topics, self.encoder_source.currentText(), self.wheel_radius.value(), self,
+                                     use_sim_time=self.profile.currentText() == "Simulation")
         self.ros_link.status.connect(self.ros_status)
         self.ros_link.encoders.connect(self.receive_encoder)
         self.ros_link.imu.connect(self.receive_imu)
@@ -1789,6 +1805,34 @@ class RoverDashboard(QMainWindow):
 
     # ---------------- ROS Topic Settings ----------------
 
+    def configure_gazebo_teleop(self):
+        """Apply a session-only standalone profile without changing saved topics."""
+        self.gazebo_teleop = True
+        self.profile.setCurrentText("Simulation")
+        for key, _title, sim_default, _kind, _hardware in TOPIC_DEFS:
+            self.topic_fields[key].setText(sim_default)
+        for key in ("ticks", "wheel_speeds", "slip", "single_slip", "map", "path",
+                    "aruco_pose", "obstacles", "aruco_debug", "pose_debug", "enc_diag",
+                    "slip_diag", "goal_pose"):
+            self.topic_fields[key].setText("")
+        self.topic_fields["pose"].setText("/odom")
+        self.topic_fields["cmd_vel"].setText("/cmd_vel_manual")
+        self.encoder_source.setCurrentText("Joint states")
+        self.wheel_radius.setValue(0.06)
+        self.profile.setEnabled(False)
+        self.steering_mode.setCurrentIndex(MODE_COORDINATED)
+        self.steering_mode.setItemText(MODE_COORDINATED, "Skid steer (Gazebo)")
+        self.steering_mode.setEnabled(False)
+        self.drivetrain_label.setText("Gazebo · 4WD skid steer")
+        self.steering_group.setTitle("Skid-steer drive")
+        self.steering_note.setText("Gazebo wheels are fixed. Turning uses different left/right wheel speeds.")
+        self.rover_view.fixed_steering = True
+        self.output_mode_combo.setItemText(1, "ROS 2 Teleop (/cmd_vel_manual)")
+        self.setWindowTitle("Mars Rover · Gazebo skid-steer teleop")
+        self.setup_status.setText("Standalone Gazebo: /odom, fixed steering, manual commands via timeout guard. Nav2 is off.")
+        self._sync_safety_ui()
+        self.log_event("INFO", "Gazebo teleop profile loaded. CONNECT ROS 2, select ROS Teleop, then ARM. Camera: select ROS RGB or Depth and Connect.")
+
     def setup_page(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -1846,6 +1890,9 @@ class RoverDashboard(QMainWindow):
         self.setup_status.setText(f"{profile} profile loaded. Reconnect ROS 2 to apply edits.")
 
     def restore_profile_defaults(self):
+        if self.gazebo_teleop:
+            self.configure_gazebo_teleop()
+            return
         profile = self.profile.currentText()
         for key, _title, sim_default, _kind, hw_default in TOPIC_DEFS:
             default = hw_default if profile == "Hardware" else sim_default
@@ -1854,6 +1901,9 @@ class RoverDashboard(QMainWindow):
         self.setup_status.setText(f"Restored {profile} default topics (click Save to persist).")
 
     def save_topics(self):
+        if self.gazebo_teleop:
+            self.setup_status.setText("Standalone Gazebo settings are session-only; saved profiles are unchanged.")
+            return
         profile = self.profile.currentText()
         for key, field in self.topic_fields.items():
             topic = field.text().strip()

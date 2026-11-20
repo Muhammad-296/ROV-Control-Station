@@ -30,6 +30,7 @@ class RoverView(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         self.readings = {}
+        self.fixed_steering = False
         self.command_active = False
         self.safety_state = SAFETY_PREVIEW
         self.steering_mode = MODE_COORDINATED
@@ -275,6 +276,7 @@ class RoverView(QWidget):
                 rpm_txt = "Drive: -- rpm"
 
             angle_txt = (
+                "Fixed wheel · skid steer" if self.fixed_steering else
                 f"Steer: {self.steer_commands[wheel]:+.0f}° sim"
                 if self.command_active
                 else "Steer: deferred"

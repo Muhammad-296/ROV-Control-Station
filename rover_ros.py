@@ -174,7 +174,7 @@ def parse_imu(message) -> dict | None:
     """
     sample = {}
     orient_cov = getattr(message, "orientation_covariance", (0,))
-    if not orient_cov or orient_cov[0] != -1:
+    if orient_cov is None or len(orient_cov) == 0 or orient_cov[0] != -1:
         q = message.orientation
         euler = quat_to_euler_deg(q.x, q.y, q.z, q.w)
         if euler is not None:
@@ -194,7 +194,7 @@ def parse_imu(message) -> dict | None:
             1.0 / 9.80665,
         ),
     ):
-        if not covariance or covariance[0] != -1:
+        if covariance is None or len(covariance) == 0 or covariance[0] != -1:
             components = (vector.x, vector.y, vector.z)
             if all(is_finite_number(v) for v in components):
                 for name, value in zip(names, components):
@@ -443,16 +443,19 @@ class RoverRosLink(QThread):
     topic_rates = Signal(dict)                      # key -> {"hz": float, "last_seen": float}
     discovered_topics = Signal(list)                # [(name, [types...])]
 
-    def __init__(self, topics: dict, source: str, wheel_radius: float, parent=None):
+    def __init__(self, topics: dict, source: str, wheel_radius: float, parent=None,
+                 use_sim_time: bool = False):
         super().__init__(parent)
         self.topics = {k: str(v).strip() for k, v in topics.items()}
         self.source = source
         self.radius = float(wheel_radius)
+        self.use_sim_time = bool(use_sim_time)
         self.previous = {}
 
         self._lock = threading.Lock()
         self._desired_camera_feed: str | None = None
         self._cmd_active = False
+        self._cmd_updated_at = 0.0
         self._cmd_twist = (0.0, 0.0, 0.0)
         self._stop_bursts = 0
         self._pending_goals: deque[tuple[float, float, float, str]] = deque()
@@ -473,6 +476,7 @@ class RoverRosLink(QThread):
         with self._lock:
             self._cmd_twist = (float(linear_x), float(linear_y), float(angular_z))
             self._cmd_active = bool(active)
+            self._cmd_updated_at = time.monotonic()
 
     def publish_stop_burst(self) -> None:
         """Immediately halt active teleop and send three consecutive zero Twist commands."""
@@ -538,6 +542,7 @@ class RoverRosLink(QThread):
             context = Context()
             rclpy.init(args=[], context=context)
             node = rclpy.create_node("meseket_gui_telemetry", context=context)
+            node.set_parameters([rclpy.parameter.Parameter('use_sim_time', value=self.use_sim_time)])
             executor = SingleThreadedExecutor(context=context)
             executor.add_node(node)
 
@@ -605,6 +610,8 @@ class RoverRosLink(QThread):
                     desired_cam = self._desired_camera_feed
                     cmd_active = self._cmd_active
                     cmd_twist = self._cmd_twist
+                    if now - self._cmd_updated_at > 0.3:
+                        cmd_twist = (0.0, 0.0, 0.0)
                     stop_bursts = self._stop_bursts
                     if stop_bursts > 0:
                         self._stop_bursts = 0

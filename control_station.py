@@ -1,5 +1,6 @@
 """Cross-platform MESEKET vehicle selector for Mars Rover and ROV control stations."""
 
+import argparse
 import importlib.util
 from pathlib import Path
 import sys
@@ -163,11 +164,19 @@ class VehicleSelector(QWidget):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--gazebo-teleop', action='store_true',
+                        help='Open the rover with standalone Gazebo topics; starts disarmed')
+    args = parser.parse_args()
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     app.setStyleSheet(SELECTOR_QSS)
-    selector = VehicleSelector()
-    selector.show()
+    if args.gazebo_teleop:
+        window = RoverDashboard()
+        window.configure_gazebo_teleop()
+    else:
+        window = VehicleSelector()
+    window.show()
     return app.exec()
 
 
