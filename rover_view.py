@@ -8,7 +8,7 @@ from ROV_Control_Station_Integrated import mono_font
 
 
 WHEELS = ("FL", "FR", "RL", "RR")
-MOTORS = tuple(f"D_{wheel}" for wheel in WHEELS) + tuple(f"S_{wheel}" for wheel in WHEELS)
+DRIVE_MOTORS = tuple(f"D_{wheel}" for wheel in WHEELS)
 
 
 class RoverView(QWidget):
@@ -91,7 +91,7 @@ class RoverView(QWidget):
             p.setFont(mono_font(12))
             p.setPen(QColor("#9fb0c3"))
             rpm = f'{drive["value"]:+.1f} rpm' if drive else "Drive: -- rpm"
-            angle = f'{steer["value"]:+.1f}°' if steer else "Steer: --°"
+            angle = f'{steer["value"]:+.1f}°' if steer else "Steer: deferred"
             p.drawText(QRectF(label_x, y - 10, 130, 22), Qt.AlignmentFlag.AlignCenter, rpm)
             p.drawText(QRectF(label_x, y + 12, 130, 22), Qt.AlignmentFlag.AlignCenter, angle)
         p.setPen(QColor("#66788f"))

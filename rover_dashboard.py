@@ -1,4 +1,4 @@
-"""Offline Rover dashboard and topic setup; no motion commands are transmitted."""
+"""Rover dashboard with optional read-only ROS telemetry; no motion commands."""
 
 import math
 import time
@@ -17,11 +17,15 @@ from ROV_Control_Station_Integrated import (
     PlotWidget, PS4Monitor, QSS, STLViewer,
     StatCard, StickWidget, make_scroll, mono_font, setup_fonts,
 )
-from rover_view import MOTORS, WHEELS, RoverView
+from rover_view import DRIVE_MOTORS, WHEELS, RoverView
+from rover_ros import RoverRosLink
 
 
 # Defaults follow the current Autonmous_Ws simulation and SLAM contracts.
 TOPICS = (
+    ("joints", "Drive joint states", "/joint_states_gz", "sensor_msgs/msg/JointState"),
+    ("ticks", "Drive encoder ticks", "/wheel/ticks", "std_msgs/msg/Int64MultiArray"),
+    ("wheel_speeds", "Wheel speeds (m/s)", "/wheel/per_wheel_speeds", "std_msgs/msg/Float64MultiArray"),
     ("map", "Map", "/map", "nav_msgs/msg/OccupancyGrid"),
     ("pose", "Estimated pose / speed", "/odometry/filtered", "nav_msgs/msg/Odometry"),
     ("imu", "Orientation", "/imu/data", "sensor_msgs/msg/Imu"),
@@ -46,6 +50,7 @@ class RoverDashboard(QMainWindow):
         super().__init__()
         self.settings = QSettings("MESEKET", "MarsRoverStation")
         self.readings = {}
+        self.ros_link = None
         # Owner contract for the shared, optional STL viewer. No ROV controller is created.
         self.armed = self.ready = False
         self.last_imu = float("-inf")
@@ -77,7 +82,7 @@ class RoverDashboard(QMainWindow):
         root.addWidget(body_scroll, 1)
         root.addWidget(self.console_panel())
         self.setCentralWidget(central)
-        self.statusBar().showMessage("OFFLINE · 4 drive + 4 steering motors · 8 encoders · No commands sent")
+        self.statusBar().showMessage("OFFLINE · 4 drive + 4 steering motors · 4 drive encoders · steering feedback deferred · No commands sent")
         self.freshness_timer = QTimer(self)
         self.freshness_timer.timeout.connect(self.refresh_readings)
         self.freshness_timer.start(250)
@@ -85,7 +90,7 @@ class RoverDashboard(QMainWindow):
     @staticmethod
     def unavailable(button):
         button.setEnabled(False)
-        button.setToolTip("Unavailable while the rover is disconnected.")
+        button.setToolTip("Rover command output is not implemented in this version.")
         return button
 
     def topbar(self):
@@ -98,7 +103,8 @@ class RoverDashboard(QMainWindow):
         title.setObjectName("title")
         row.addWidget(title)
         row.addStretch()
-        row.addWidget(Pill("Disconnected", "idle"))
+        self.connection_pill = Pill("Disconnected", "idle")
+        row.addWidget(self.connection_pill)
         self.safety_pill = Pill("STATE UNKNOWN", "warn")
         row.addWidget(self.safety_pill)
         back = QPushButton("Vehicle selection")
@@ -106,10 +112,14 @@ class RoverDashboard(QMainWindow):
         row.addWidget(back)
         layout.addLayout(row)
         actions = QHBoxLayout()
-        actions.addWidget(message("Connect → confirm state → operate"))
+        actions.addWidget(message("Read-only telemetry · motion controls unavailable"))
         actions.addStretch()
-        for text, name in (("CONNECT", "connect"), ("ARM", "arm"), ("RESET LATCH", "tool"),
-                           ("■  E-STOP · OFFLINE", "estop")):
+        self.connect_button = QPushButton("CONNECT ROS 2")
+        self.connect_button.setObjectName("connect")
+        self.connect_button.clicked.connect(self.toggle_ros)
+        actions.addWidget(self.connect_button)
+        for text, name in (("ARM", "arm"), ("RESET LATCH", "tool"),
+                           ("■  E-STOP · UNAVAILABLE", "estop")):
             button = QPushButton(text)
             button.setObjectName(name)
             actions.addWidget(self.unavailable(button))
@@ -123,7 +133,7 @@ class RoverDashboard(QMainWindow):
         inspect = QPushButton("OPEN MOTOR PANEL  [D1–D4 / S1–S4]")
         inspect.clicked.connect(lambda: self.center_tabs.setCurrentIndex(1))
         modes.addWidget(inspect)
-        modes.addWidget(message("4 drive motors · 4 steering motors · 8 independent encoders"), 1)
+        modes.addWidget(message("4 drive motors · 4 steering motors · steering encoders not implemented"), 1)
         layout.addLayout(modes)
         return bar
 
@@ -178,7 +188,7 @@ class RoverDashboard(QMainWindow):
         self.center_tabs.addTab(make_scroll(self.motor_page()), "Motor Station")
         sensors = QTabWidget()
         sensors.addTab(make_scroll(self.sensor_page()), "IMU / rover health")
-        sensors.addTab(self.encoder_page(), "8 Encoders")
+        sensors.addTab(self.encoder_page(), "Drive encoders")
         self.center_tabs.addTab(sensors, "Sensors")
         self.ps4_monitor = PS4Monitor(self.settings)
         self.ps4_monitor.status.setText("OFFLINE · controller monitoring not connected")
@@ -197,7 +207,8 @@ class RoverDashboard(QMainWindow):
         vehicle = QGroupBox("Rover · drive and steering motors")
         view_layout = QVBoxLayout(vehicle)
         header = QHBoxLayout()
-        header.addWidget(QLabel("Telemetry: disconnected"), 1)
+        self.telemetry_label = QLabel("Telemetry: disconnected")
+        header.addWidget(self.telemetry_label, 1)
         self.camera_toggle = QPushButton("▶ Camera stream")
         self.camera_toggle.setObjectName("camtoggle")
         self.camera_toggle.setCheckable(True)
@@ -239,30 +250,29 @@ class RoverDashboard(QMainWindow):
             grid = QGridLayout(group)
             for i, wheel in enumerate(WHEELS):
                 motor = f"{prefix}_{wheel}"
-                card = StatCard(f"{prefix}{i + 1} · {wheel}", "-- rpm" if prefix == "D" else "--°")
+                card = StatCard(f"{prefix}{i + 1} · {wheel}", "-- rpm" if prefix == "D" else "Not implemented")
                 self.motor_cards[motor] = card
                 grid.addWidget(card, i // 2 * 2, i % 2)
                 button = QPushButton(f"Inspect {prefix}{i + 1} · {wheel}")
                 grid.addWidget(self.unavailable(button), i // 2 * 2 + 1, i % 2)
             layout.addWidget(group)
-        layout.addWidget(message("Encoder feedback is shown under Sensors → 8 Encoders. Motor commands and measured feedback are separate."))
+        layout.addWidget(message("Encoder feedback is shown under Sensors → Drive encoders. Motor commands and measured feedback are separate."))
         layout.addStretch()
         return page
 
     def encoder_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.addWidget(message("E1–E4: drive encoders · E5–E8: steering encoders. Values remain unknown until received."))
-        self.encoder_table = QTableWidget(8, 6)
-        self.encoder_table.setHorizontalHeaderLabels(["Encoder", "Motor", "Wheel", "Ticks", "RPM / angle", "Status"])
-        for row, motor in enumerate(MOTORS):
-            prefix = "D" if row < 4 else "S"
-            for col, text in enumerate((f"E{row + 1}", f"{prefix}{row % 4 + 1}", WHEELS[row % 4], "--", "--", "No data")):
+        layout.addWidget(message("E1–E4: drive encoders · Steering encoders are deferred until their ROS interface is implemented."))
+        self.encoder_table = QTableWidget(4, 6)
+        self.encoder_table.setHorizontalHeaderLabels(["Encoder", "Motor", "Wheel", "Raw ticks", "RPM", "Status"])
+        for row, motor in enumerate(DRIVE_MOTORS):
+            for col, text in enumerate((f"E{row + 1}", f"D{row + 1}", WHEELS[row], "--", "--", "No data")):
                 self.encoder_table.setItem(row, col, QTableWidgetItem(text))
         self.encoder_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.encoder_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.encoder_table)
-        layout.addWidget(message("Drive units: rpm · Steering units: degrees · Readings older than 2 seconds are marked stale."))
+        layout.addWidget(message("Joint-state speed is converted from rad/s to RPM. Raw ticks are shown only when received; each field expires after 2 seconds."))
         return page
 
     def sensor_page(self):
@@ -270,29 +280,33 @@ class RoverDashboard(QMainWindow):
         layout = QVBoxLayout(page)
         gauges = QWidget()
         instruments = QGridLayout(gauges)
-        horizon = AttitudeWidget()
-        compass = CompassWidget()
+        self.horizon = horizon = AttitudeWidget()
+        self.compass = compass = CompassWidget()
         horizon.setEnabled(False)
         compass.setEnabled(False)
         instruments.addWidget(horizon, 0, 0)
         instruments.addWidget(compass, 0, 1)
-        no_data = QLabel("NO IMU DATA · instrument positions are placeholders")
+        self.imu_overlay = no_data = QLabel("NO IMU DATA · instrument positions are placeholders")
         no_data.setAlignment(Qt.AlignmentFlag.AlignCenter)
         no_data.setStyleSheet("background:#101822; color:#fbbf24; padding:8px;")
         instruments.addWidget(no_data, 0, 0, 1, 2, Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(gauges)
         cards = QGridLayout()
+        self.imu_cards = {}
         for i, caption in enumerate(("ROLL", "PITCH", "HEADING", "ROVER SPEED", "BATTERY", "WHEEL SLIP")):
-            cards.addWidget(StatCard(caption, "--"), i // 3, i % 3)
+            card = StatCard(caption, "--")
+            cards.addWidget(card, i // 3, i % 3)
+            self.imu_cards[caption] = card
         layout.addLayout(cards)
         group = QGroupBox("Subsystem health")
         form = QFormLayout(group)
         for name in ("SLAM / localization", "Nav2 navigation", "Drive controller", "Steering controller", "Camera / perception"):
             form.addRow(name, QLabel("Unknown · disconnected"))
         layout.addWidget(group)
-        layout.addWidget(message("No live IMU, battery or navigation data received."))
-        layout.addWidget(PlotWidget("Attitude · awaiting IMU", "deg", ("roll", "pitch", "yaw"),
-                                    time.monotonic, min_span=20), 1)
+        layout.addWidget(message("IMU updates when ROS data arrives. Battery and navigation connections are pending."))
+        self.attitude_plot = PlotWidget("Attitude", "deg", ("roll", "pitch", "yaw"),
+                                        time.monotonic, min_span=20)
+        layout.addWidget(self.attitude_plot, 1)
         return page
 
     def settings_panel(self):
@@ -330,7 +344,7 @@ class RoverDashboard(QMainWindow):
         self.console.setMaximumBlockCount(600)
         self.console.setFont(mono_font(12))
         self.console.appendPlainText("OFFLINE · Rover dashboard ready. No commands sent.")
-        self.console.appendPlainText("4 drive motors + 4 steering motors · waiting for 8 encoder channels.")
+        self.console.appendPlainText("4 drive encoders available · steering encoder integration deferred.")
         layout.addWidget(self.console)
         clear = QPushButton("Clear log")
         clear.clicked.connect(self.console.clear)
@@ -341,48 +355,129 @@ class RoverDashboard(QMainWindow):
         outer.addWidget(group)
         return wrap
 
-    def update_encoder(self, motor, ticks, value):
-        """Future backend entry point: D_FL..D_RR rpm, S_FL..S_RR degrees.
+    def toggle_ros(self):
+        if self.ros_link is not None:
+            self.ready = False
+            self.connect_button.setEnabled(False)
+            self.ros_link.requestInterruption()
+            return
+        topics = {key: field.text().strip() for key, field in self.topic_fields.items()}
+        if any(not topic or any(c.isspace() for c in topic) for topic in topics.values()):
+            self.console.appendPlainText("Enter valid topic names under ROS / Camera before connecting.")
+            return
+        self.readings.clear()
+        self.last_imu = float("-inf")
+        self.attitude_plot.clear()
+        self.ros_link = RoverRosLink(topics, self.encoder_source.currentText(),
+                                     self.wheel_radius.value(), self)
+        self.ros_link.status.connect(self.ros_status)
+        self.ros_link.encoders.connect(self.receive_encoder)
+        self.ros_link.imu.connect(self.receive_imu)
+        self.ros_link.finished.connect(self.ros_finished)
+        self.connect_button.setText("DISCONNECT")
+        self.console.appendPlainText("Starting read-only ROS 2 telemetry. No motor commands will be sent.")
+        self.ros_link.start()
 
-        Call on the GUI thread. Raw ticks are supplied by the controller; no
-        ticks-to-angle/RPM conversion is guessed without encoder calibration.
-        """
-        if motor not in MOTORS:
-            raise ValueError(f"Unknown rover motor: {motor}")
-        if isinstance(ticks, bool) or not isinstance(ticks, int):
-            raise ValueError("Encoder ticks must be an integer")
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-            raise ValueError("Encoder feedback must be a finite number")
-        self.readings[motor] = {"ticks": ticks, "value": float(value), "received": time.monotonic()}
+    def ros_status(self, listening, detail):
+        self.ready = listening
+        self.connection_pill.set_state("ROS listening" if listening else "Disconnected",
+                                       "warn" if listening else "idle")
+        self.telemetry_label.setText(detail)
+        self.console.appendPlainText(detail)
+
+    def ros_finished(self):
+        self.ready = False
+        self.last_imu = float("-inf")
+        self.ros_link.deleteLater()
+        self.ros_link = None
+        self.connect_button.setText("CONNECT ROS 2")
+        self.connect_button.setEnabled(True)
+        self.connection_pill.set_state("Disconnected", "idle")
+        self.telemetry_label.setText("Telemetry: disconnected")
+        self.console.appendPlainText("ROS telemetry stopped.")
+        self.refresh_readings()
+
+    def receive_encoder(self, motor, ticks, rpm):
+        if self.ready:
+            self.update_encoder(motor, ticks, rpm)
+
+    def receive_imu(self, values):
+        if not self.ready:
+            return
+        self.imu = values
+        self.last_imu = time.monotonic()
+        self.horizon.set_attitude(values["roll"], values["pitch"])
+        self.compass.set_yaw(values["yaw"])
+        self.attitude_plot.add(self.last_imu, [values[key] for key in ("roll", "pitch", "yaw")])
+        for caption, key in (("ROLL", "roll"), ("PITCH", "pitch"), ("HEADING", "yaw")):
+            self.imu_cards[caption].set(f'{values[key]:+.1f}°')
+
+    def update_encoder(self, motor, ticks, value):
+        """GUI-thread entry point. Raw ticks and measured RPM arrive independently."""
+        if motor not in DRIVE_MOTORS:
+            raise ValueError(f"Drive encoder not supported: {motor}")
+        if ticks is not None and (isinstance(ticks, bool) or not isinstance(ticks, int)):
+            raise ValueError("Encoder ticks must be an integer or None")
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)):
+            raise ValueError("Encoder RPM must be a finite number or None")
+        reading = self.readings.setdefault(motor, {})
+        now = time.monotonic()
+        if ticks is not None:
+            reading.update(ticks=ticks, ticks_received=now)
+        if value is not None:
+            reading.update(value=float(value), received=now)
         self.refresh_readings()
 
     def refresh_readings(self):
         now = time.monotonic()
         fresh = {}
-        for row, motor in enumerate(MOTORS):
-            reading = self.readings.get(motor)
-            live = reading is not None and now - reading["received"] <= 2.0
-            unit = " rpm" if row < 4 else "°"
-            self.encoder_table.item(row, 3).setText(str(reading["ticks"]) if reading else "--")
-            text = f'{reading["value"]:+.1f}{unit}' if reading else "--"
-            self.encoder_table.item(row, 4).setText(text)
-            self.encoder_table.item(row, 5).setText("Live" if live else "Stale" if reading else "No data")
-            self.motor_cards[motor].set(text if live else "STALE" if reading else f"--{unit}")
-            if live:
+        for row, motor in enumerate(DRIVE_MOTORS):
+            reading = self.readings.get(motor, {})
+            speed_live = self.ready and now - reading.get("received", float("-inf")) <= 2.0
+            ticks_live = self.ready and now - reading.get("ticks_received", float("-inf")) <= 2.0
+            ticks = str(reading["ticks"]) if ticks_live else "STALE" if "ticks" in reading else "--"
+            rpm = f'{reading["value"]:+.1f} rpm' if speed_live else "STALE" if "value" in reading else "-- rpm"
+            self.encoder_table.item(row, 3).setText(ticks)
+            self.encoder_table.item(row, 4).setText(rpm)
+            status = "Live" if speed_live and ticks_live else "RPM only" if speed_live else "Ticks only" if ticks_live else "Stale" if reading else "No data"
+            self.encoder_table.item(row, 5).setText(status)
+            self.motor_cards[motor].set(rpm)
+            if speed_live:
                 fresh[motor] = reading
         self.rover_view.set_readings(fresh)
+        imu_live = self.ready and now - self.last_imu <= 2.0
+        if self.ready:
+            self.telemetry_label.setText(f"Drive RPM: {len(fresh)}/4 channels · steering feedback deferred")
+            self.connection_pill.set_state("Telemetry live" if fresh or imu_live else "ROS listening",
+                                           "ok" if fresh or imu_live else "warn")
+        state = "ROS listening" if self.ready else "OFFLINE"
+        self.statusBar().showMessage(f"{state} · 4 drive encoders · steering feedback deferred · No commands sent")
+        self.imu_overlay.setVisible(not imu_live)
+        self.horizon.setEnabled(imu_live)
+        self.compass.setEnabled(imu_live)
+        if not imu_live:
+            for caption in ("ROLL", "PITCH", "HEADING"):
+                self.imu_cards[caption].set("--")
 
     def setup_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.addWidget(message(
-            "Save topic names for the future ROS connection. Saving does not connect "
-            "to a rover. This screen runs on Windows and Ubuntu without ROS installed."
+            "Read-only ROS 2 telemetry. Choose an encoder source, then use CONNECT ROS 2. "
+            "Topic changes apply on the next connection."
         ))
         form = QFormLayout()
         self.profile = QComboBox()
         self.profile.addItems(["Simulation", "Hardware"])
         form.addRow("Environment", self.profile)
+        self.encoder_source = QComboBox()
+        self.encoder_source.addItems(["Joint states", "Ticks and wheel speeds"])
+        form.addRow("Drive feedback", self.encoder_source)
+        self.wheel_radius = QDoubleSpinBox()
+        self.wheel_radius.setRange(0.001, 2.0)
+        self.wheel_radius.setDecimals(4)
+        self.wheel_radius.setSuffix(" m")
+        form.addRow("Wheel radius", self.wheel_radius)
         layout.addLayout(form)
         self.topic_fields = {}
         for key, title, default, kind in TOPICS:
@@ -391,7 +486,7 @@ class RoverDashboard(QMainWindow):
             field.setToolTip(kind)
             self.topic_fields[key] = field
             layout.addWidget(field)
-        layout.addWidget(message("Eight-encoder transport: not configured. No encoder topic or packet format has been assumed."))
+        layout.addWidget(message("Four drive encoders are supported. Steering encoder feedback is not implemented. Wheel radius must match the encoder node when converting wheel speeds from m/s to RPM."))
         self.setup_status = message("")
         layout.addWidget(self.setup_status)
         save = QPushButton("Save Rover topic settings")
@@ -412,8 +507,12 @@ class RoverDashboard(QMainWindow):
         for key, _, default, _ in TOPICS:
             if key == "wheel_odom" and profile == "Hardware":
                 default = "/wheel/odom_raw"
+            if key == "joints" and profile == "Hardware":
+                default = "/joint_states"
             self.topic_fields[key].setText(self.settings.value(f"{profile}/{key}", default))
-        self.setup_status.setText("Offline · Unsaved edits are discarded when changing environment.")
+        self.encoder_source.setCurrentText(self.settings.value(f"{profile}/encoder_source", "Joint states" if profile == "Simulation" else "Ticks and wheel speeds"))
+        self.wheel_radius.setValue(float(self.settings.value(f"{profile}/wheel_radius", 0.06)))
+        self.setup_status.setText("Unsaved edits are discarded when changing environment. ROS 2 must be installed and sourced to connect.")
 
     def save_topics(self):
         profile = self.profile.currentText()
@@ -424,15 +523,24 @@ class RoverDashboard(QMainWindow):
                 field.setFocus()
                 return
         self.settings.setValue("profile", profile)
+        self.settings.setValue(f"{profile}/encoder_source", self.encoder_source.currentText())
+        self.settings.setValue(f"{profile}/wheel_radius", self.wheel_radius.value())
         for key, field in self.topic_fields.items():
             self.settings.setValue(f"{profile}/{key}", field.text().strip())
         self.settings.sync()
         if self.settings.status() != QSettings.Status.NoError:
             self.setup_status.setText("Could not save settings. Check local settings storage permissions.")
             return
-        self.setup_status.setText(f"{profile} topic settings saved locally. Still offline.")
+        self.setup_status.setText(f"{profile} topic settings saved. Reconnect to apply changes.")
 
     def closeEvent(self, event):
+        if self.ros_link is not None and self.ros_link.isRunning():
+            self.ready = False
+            self.ros_link.requestInterruption()
+            if not self.ros_link.wait(1500):
+                self.console.appendPlainText("ROS is still stopping. Try leaving Rover mode again shortly.")
+                event.ignore()
+                return
         if self.stl_viewer.loader and self.stl_viewer.loader.isRunning():
             self.stl_viewer.info.setText("Wait for the model to finish loading before leaving Rover mode.")
             event.ignore()

@@ -53,7 +53,7 @@ class VehicleSelector(QWidget):
         self.rov_button = QPushButton("ROV  ·  Existing underwater control station")
         self.rov_button.clicked.connect(self.open_rov)
         layout.addWidget(self.rov_button)
-        note = QLabel("Rover: offline setup available. ROV: existing hardware controls.")
+        note = QLabel("Rover: optional ROS 2 telemetry. ROV: existing hardware controls.")
         note.setWordWrap(True)
         layout.addWidget(note)
 

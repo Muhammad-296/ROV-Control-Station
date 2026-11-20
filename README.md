@@ -107,31 +107,54 @@ install the full `requirements.txt` dependencies as described below.
 Rover mode uses the ROV's layout and shared visual components: top connection
 and safety bar, left manual controls, centre vehicle/sensor tabs, right settings
 and bottom log. It includes a rover schematic, four drive motors, four steering
-motors, eight encoder rows, a camera view, PS4 monitor and optional STL viewer
+motors, four drive encoder rows, a camera view, PS4 monitor and optional STL viewer
 (requires VTK). Simulation and Hardware profiles keep separate ROS topic settings.
-The updated eight-motor layout follows the requested rover hardware; it does not
-change the older skid-steer model or controllers in `Autonmous_Ws`.
+The four steering motors remain visible, with feedback marked **Not implemented**.
+Steering encoder integration is deferred; the current ROS stack supplies drive
+encoders only. The GUI does not change the older skid-steer controller/model.
 
-| Wheel | Drive / encoder | Steering / encoder |
+| Wheel | Drive / encoder | Steering (feedback deferred) |
 | :-- | :-- | :-- |
-| Front left | D1 / E1 | S1 / E5 |
-| Front right | D2 / E2 | S2 / E6 |
-| Rear left | D3 / E3 | S3 / E7 |
-| Rear right | D4 / E4 | S4 / E8 |
+| Front left | D1 / E1 | S1 |
+| Front right | D2 / E2 | S2 |
+| Rear left | D3 / E3 | S3 |
+| Rear right | D4 / E4 | S4 |
 
-Encoder rows show raw ticks, drive RPM or steering angle, and data freshness.
-Missing readings show `--`; readings older than two seconds are marked stale.
-An eventual backend can call `RoverDashboard.update_encoder(motor, ticks, value)`
-on the GUI thread: motor IDs are `D_FL`, `D_FR`, `D_RL`, `D_RR`, `S_FL`, `S_FR`,
-`S_RL`, `S_RR`; values are measured RPM for drive or degrees for steering.
-No ticks-to-angle conversion is guessed without encoder calibration.
+**Read-only ROS 2 connection:** start the GUI from an environment with ROS 2
+sourced and a matching Python interpreter that can import `rclpy` and PySide6.
+For example, on the existing Ubuntu/Jazzy setup:
 
-The dashboard does **not** connect to ROS, poll a gamepad, receive hardware
-telemetry, stream cameras or send movement commands yet. Motion, arm and stop
-buttons are disabled. The camera button switches the centre view to an offline
-camera placeholder. Local drive limits and joystick preferences are saved but
-not applied to hardware. Live integration needs the actual encoder topic or
-packet format, command ownership and stop acknowledgement before driving.
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 control_station.py
+```
+
+Select **Mars Rover**, choose the profile/source under **ROS / Camera**, then
+press **CONNECT ROS 2**. The laptop and rover need matching `ROS_DOMAIN_ID`
+settings and ROS discovery/network access. Without ROS installed, the dashboard
+still opens; connection failure is reported in the rover log. Windows live
+telemetry requires its own compatible ROS 2 Python environment; no network
+bridge is bundled in this version.
+
+| Source | Topics | Conversion |
+| :-- | :-- | :-- |
+| Simulation / Joint states | `/joint_states_gz` (`sensor_msgs/msg/JointState`) | Joint velocity rad/s → RPM; if absent, derive speed from consecutive stamped positions |
+| Hardware / Ticks and wheel speeds | `/wheel/ticks` (`std_msgs/msg/Int64MultiArray`), `/wheel/per_wheel_speeds` (`std_msgs/msg/Float64MultiArray`) | Counts shown directly; wheel speed m/s → RPM using configured wheel radius |
+| Orientation | `/imu/data` (`sensor_msgs/msg/Imu`) | Quaternion → roll, pitch and heading |
+
+Drive array order follows the encoder node's default: **FL, FR, RL, RR**.
+Simulation joint matching uses `left_front_wheel_joint`, `right_front_wheel_joint`,
+`left_rear_wheel_joint`, `right_rear_wheel_joint` and their front/rear aliases.
+Raw ticks are not fabricated from simulated joint positions. Missing fields show
+`--`; ticks and speed each expire independently after two seconds. Hardware
+speed conversion defaults to the encoder configuration's 0.06 m wheel radius;
+set it to the actual value used by your encoder node. Custom `wheel_names` array
+orders and individual tick topics are not supported by this GUI adapter yet.
+
+Motor commands, arming, stop, gamepad input, camera streaming, battery and
+navigation telemetry are not connected in Rover mode. Their controls remain
+unavailable or show unknown data. Local drive limits are saved only. Map/camera
+and other topic fields are retained for later connections. ROV mode is unchanged.
 
 ROV mode launches the original application in a separate process using the
 same Python environment. Closing either vehicle window returns to the selector.
