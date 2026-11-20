@@ -118,7 +118,8 @@ The system-site-packages option also exposes existing ROS/system dependencies.
 The launcher uses this environment when present; global Python packages are not
 changed.
 
-Rover mode uses the ROV's layout and shared visual components: top connection
+Rover mode uses the ROV's layout and shared visual components with a restrained
+Mars red theme: top connection
 and safety bar, left manual controls, centre vehicle/sensor tabs, right settings
 and bottom log. It includes a rover schematic, four drive motors, four steering
 motors, four drive encoder rows, a camera view, PS4 monitor and optional STL viewer
@@ -165,10 +166,37 @@ speed conversion defaults to the encoder configuration's 0.06 m wheel radius;
 set it to the actual value used by your encoder node. Custom `wheel_names` array
 orders and individual tick topics are not supported by this GUI adapter yet.
 
-Motor commands, arming, stop, gamepad input, camera streaming, battery and
-navigation telemetry are not connected in Rover mode. Their controls remain
-unavailable or show unknown data. Local drive limits are saved only. Map/camera
-and other topic fields are retained for later connections. ROV mode is unchanged.
+**Operator controls and animation:** enable **INPUT PREVIEW** for local keyboard
+or gamepad control of the animated rover. W/S moves the wheel preview, A/D steers,
+Q/E turns; Space stops and disables preview, and Esc exits preview. Coordinated,
+crab and turn-in-place modes change the simulated wheel arrangement. Wheel
+treads, steering pivots, command bars, joystick trails and tab fades animate;
+the actual ROS measurements remain separate from preview values. Power, expo,
+deadzone, smoothing and joystick axis/inversion settings are saved locally.
+
+**Motor Test Station:** open the separate window and enable INPUT PREVIEW.
+Hold 1–4 for drive channels or 5–8 for steering channels; releasing stops the
+selected preview. Each channel has its own level, inversion and hold buttons.
+Only one channel previews at a time. Changing window focus clears held input.
+
+**Camera:** the Camera settings tab offers RTSP host, port, path, credentials and
+TCP/UDP selection, plus connect/stop, a separate monitor, fullscreen and snapshots.
+It uses the ROV's existing OpenCV capture worker. The centre view can switch
+between the rover schematic and camera. Credentials are entered each session
+and are never saved. Connecting is explicit; opening the dashboard or monitor
+does not access the camera. Camera streaming requires OpenCV.
+
+**Sensors:** attitude, gyro and acceleration plots offer pause, clear, time
+window selection and received-sample CSV recording. Drive encoder snapshots
+can also be exported as CSV. PS4 Monitor now displays actual local controller
+inputs when pygame and a controller are available.
+
+Physical motor commands, arming, hardware E-STOP/reset, auxiliary outputs,
+battery and navigation telemetry are not connected in Rover mode. Their controls
+remain unavailable or show unknown data. Preview is never sent to ROS or motor
+hardware. Steering encoder readings remain deferred. Map and other unused topic
+fields are retained for later connections. ROV controls and colours retain their
+existing defaults; shared drawing widgets only gained optional accent arguments.
 
 ROV mode launches the original application in a separate process using the
 same Python environment. Closing either vehicle window returns to the selector.

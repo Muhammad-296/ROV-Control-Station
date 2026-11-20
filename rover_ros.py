@@ -121,8 +121,17 @@ class RoverRosLink(QThread):
         if norm < 1e-9:
             return
         x, y, z, w = (value / norm for value in values)
-        self.imu.emit({
+        sample = {
             "roll": math.degrees(math.atan2(2 * (w*x + y*z), 1 - 2 * (x*x + y*y))),
             "pitch": math.degrees(math.asin(max(-1, min(1, 2 * (w*y - z*x))))),
             "yaw": math.degrees(math.atan2(2 * (w*z + x*y), 1 - 2 * (y*y + z*z))),
-        })
+        }
+        for vector, covariance, names, scale in (
+            (message.angular_velocity, message.angular_velocity_covariance, ("gx", "gy", "gz"), 180 / math.pi),
+            (message.linear_acceleration, message.linear_acceleration_covariance, ("ax", "ay", "az"), 1 / 9.80665),
+        ):
+            if covariance[0] != -1:
+                components = (vector.x, vector.y, vector.z)
+                if all(self.number(value) for value in components):
+                    sample.update({name: value * scale for name, value in zip(names, components)})
+        self.imu.emit(sample)
