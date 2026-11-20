@@ -90,6 +90,102 @@ flowchart LR
 
 ## Quick start
 
+### Rover / ROV selector (Windows and Ubuntu)
+
+Launch `python control_station.py`, `RUN_GUI.bat` on Windows, or
+`bash RUN_GUI.sh` on Ubuntu. Choose **Mars Rover** or **ROV** at startup.
+The selector and offline Rover dashboard require only PySide6:
+
+```bash
+python -m pip install "PySide6>=6.7,!=6.12.0,<7"
+python control_station.py
+```
+
+On Ubuntu, use `python3` in an activated virtual environment. For ROV mode,
+install the full `requirements.txt` dependencies as described below.
+
+If Python 3.10/3.11 exits with `none_dealloc: deallocating None`, check the
+PySide6 version. Version 6.12.0 has a reference-counting defect; it is excluded
+from the requirements. Use a project environment with the known working 6.11.2:
+
+```bash
+python3 -m venv --system-site-packages .venv
+.venv/bin/python -m pip install "PySide6==6.11.2"
+./RUN_GUI.sh
+```
+
+The system-site-packages option also exposes existing ROS/system dependencies.
+The launcher uses this environment when present; global Python packages are not
+changed.
+
+Rover mode matches the ROV's layout and shared visual components with a Mars red
+theme: top connection/safety bar, left manual controls, centre vehicle/map/sensor
+tabs, right settings, and bottom filterable log. It includes an animated 4WD/4WS
+rover schematic, 2D SLAM/Nav2 map with ArUco and obstacle overlays, four drive
+motors, four steering motors, four drive encoder rows, unified ROS/RTSP camera
+streaming, Motor Test Station with guided 8-motor inspection, PS4 monitor, ROS
+diagnostics, and optional 3D STL viewer (VTK). Simulation and Hardware profiles
+keep separate ROS topic settings. Steering encoder feedback remains deferred and
+is clearly marked **Not implemented** until a hardware ROS interface publishes it.
+
+| Wheel | Drive / encoder | Steering (feedback deferred) |
+| :-- | :-- | :-- |
+| Front left | D1 / E1 | S1 |
+| Front right | D2 / E2 | S2 |
+| Rear left | D3 / E3 | S3 |
+| Rear right | D4 / E4 | S4 |
+
+**ROS 2 connection & safety gating:** start the GUI from an environment with
+ROS 2 sourced and a matching Python interpreter (`rclpy` + PySide6):
+
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 control_station.py
+```
+
+Select **Mars Rover**, choose **Simulation** or **Hardware** under **ROS**, then
+press **CONNECT ROS 2**. By default, **OUTPUT** starts in **Preview Only (Safe)**
+(zero ROS publishers active). Switching **OUTPUT** to **ROS 2 Teleop (`/cmd_vel`)**
+requires connecting ROS 2 and pressing **ARM** before publishing `/cmd_vel`
+(`geometry_msgs/msg/Twist`) or `/goal_pose` (`geometry_msgs/msg/PoseStamped`).
+Pressing **■ E-STOP** (or `Space` / `Esc`) immediately sends a zero-velocity
+burst, cancels any waypoint mission, and latches outputs until **RESET LATCH**
+is pressed.
+
+| Subsystem | Default Topic (Simulation / Hardware) | Message Type | Purpose |
+| :-- | :-- | :-- | :-- |
+| Drive joint states | `/joint_states_gz` / `/joint_states` | `sensor_msgs/msg/JointState` | Joint rad/s → RPM (or position differentiation) |
+| Drive ticks | `/wheel/ticks` or `/wheel/ticks/{wheel}` | `std_msgs/msg/Int64MultiArray` / `Int64` | Raw encoder tick counts (`FL, FR, RL, RR`) |
+| Wheel speeds | `/wheel/per_wheel_speeds` | `std_msgs/msg/Float64MultiArray` | Wheel linear speeds (m/s) → RPM |
+| Orientation / IMU | `/imu/data` | `sensor_msgs/msg/Imu` | Attitude, gyro (°/s), accel (g) |
+| EKF Pose & Speed | `/odometry/filtered` | `nav_msgs/msg/Odometry` | Rover `(X, Y, Yaw)` and speed (m/s) |
+| Slip monitor | `/wheel/slip_detected`, `/wheel/single_wheel_slip` | `std_msgs/msg/Bool` | Slip warning indicators |
+| SLAM Map & Nav2 Plan | `/map`, `/plan` | `OccupancyGrid`, `Path` | Live 2D map and global route |
+| Perception | `/perception/aruco_pose`, `/perception/obstacles_only` | `PoseStamped`, `Detection3DArray` | Landmark and 3D obstacle map overlays |
+| Cameras | `/camera/image_raw`, `/camera/depth/image_raw`, `/marker_detection/*` | `sensor_msgs/msg/Image` | On-demand RGB, colorized depth, and ArUco debug feeds |
+| Diagnostics | `/slam/encoder_diagnostics`, `/slam/slip_diagnostics` | `diagnostic_msgs/msg/DiagnosticArray` | Node health and topic Hz rates |
+| Gated Commands | `/cmd_vel`, `/goal_pose` | `Twist`, `PoseStamped` | Published only when ARMED in ROS 2 Teleop mode |
+
+**Operator controls, map & inspection:**
+- **Manual / Joystick:** `W/S` drive, `A/D` steer, `Q/E` turn, `Space` / `Esc` stop; supports Coordinated, Crab, and Turn-in-Place 4WS kinematics with trajectory preview.
+- **Navigation / Map:** interactive zoom/pan 2D SLAM map, Follow Rover mode, waypoint queue with JSON save/load and auto-advance when armed.
+- **Motor Test Station:** detached window (`1–4` drive, `5–8` steering preview) with common sliders, reverse toggle, live RPM readouts, and an 8-step guided inspection checklist with CSV export.
+- **Camera:** unified switcher between ROS 2 RGB, colorized Depth, ArUco/Pose debug images, and Direct RTSP (anonymous or authenticated, never auto-connects on view toggle) with detached fullscreen monitor (`F11`) and PNG snapshots.
+- **Sensors & Telemetry Black-Box:** live 3-column IMU HUD with **Zero yaw**, Subsystem Health Matrix, topic Hz monitor, and unified telemetry CSV recording (pose, IMU, 4-wheel ticks/RPM, slip state).
+
+**Verification:**
+```bash
+.venv/bin/python -m py_compile *.py
+.venv/bin/python test_protocol.py
+QT_QPA_PLATFORM=offscreen .venv/bin/python test_rover_gui.py
+```
+
+ROV mode launches the original application in a separate process using the
+same Python environment. Closing either vehicle window returns to the selector.
+The original ROV Python entry point, dedicated `START_ROV_*` launchers, firmware,
+settings and executable build scripts remain ROV-only and unchanged. The new
+selector is a Python source launcher; existing EXE builds do not include it.
+
 ### 1 — Requirements
 
 - **Windows + Python 3.12** for the documented GUI workflow.

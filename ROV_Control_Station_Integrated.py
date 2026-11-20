@@ -914,8 +914,9 @@ class Pill(QWidget):
 class LogoMark(QWidget):
     """Tiny rotating radar sweep used as the app logo."""
 
-    def __init__(self):
+    def __init__(self, accent=None):
         super().__init__()
+        self.accent = QColor(accent or "#2dd4bf")
         self.setFixedSize(38, 38)
         self._phase = 0.0
         animate(self)
@@ -937,9 +938,9 @@ class LogoMark(QWidget):
         p.drawLine(QPointF(c.x() - R, c.y()), QPointF(c.x() + R, c.y()))
         p.drawLine(QPointF(c.x(), c.y() - R), QPointF(c.x(), c.y() + R))
         cg = QConicalGradient(c, -(self._phase * 110) % 360)
-        sweep = QColor("#2dd4bf")
+        sweep = QColor(self.accent)
         sweep.setAlpha(170)
-        clear = QColor("#2dd4bf")
+        clear = QColor(self.accent)
         clear.setAlpha(0)
         cg.setColorAt(0.0, sweep)
         cg.setColorAt(0.22, clear)
@@ -954,8 +955,10 @@ class LogoMark(QWidget):
 class AxisBar(QWidget):
     """Centered -100..+100 bar with eased motion."""
 
-    def __init__(self, title):
+    def __init__(self, title, positive_color=None, negative_color=None):
         super().__init__()
+        self.positive_color = QColor(positive_color or COL_POS)
+        self.negative_color = QColor(negative_color or COL_NEG)
         self.title = title
         self.target = self.shown = 0.0
         self.setMinimumHeight(32)
@@ -989,7 +992,7 @@ class AxisBar(QWidget):
         v = self.shown
         length = half * abs(v) / 100.0
         if length > 0.5:
-            col = COL_POS if v >= 0 else COL_NEG
+            col = self.positive_color if v >= 0 else self.negative_color
             rect = QRectF(cx if v >= 0 else cx - length, track.top(), length, track.height())
             g = QLinearGradient(rect.left(), 0, rect.right(), 0)
             a, b = col.darker(170), col.lighter(115)
@@ -1019,8 +1022,9 @@ class AxisBar(QWidget):
 class StickWidget(QWidget):
     """Joystick position indicator with eased dot and fading trail."""
 
-    def __init__(self, title, caption):
+    def __init__(self, title, caption, accent=None):
         super().__init__()
+        self.accent = QColor(accent or COL_POS)
         self.title, self.caption = title, caption
         self.tx = self.ty = self.x = self.y = 0.0
         self.trail = deque(maxlen=16)
@@ -1072,7 +1076,7 @@ class StickWidget(QWidget):
 
         dot, mag = pos(self.x, self.y)
         active = mag > 0.02
-        col = COL_POS if active else QColor("#4b5b70")
+        col = self.accent if active else QColor("#4b5b70")
         n = len(self.trail)
         p.setPen(Qt.PenStyle.NoPen)
         for i, (tx, ty) in enumerate(self.trail):
