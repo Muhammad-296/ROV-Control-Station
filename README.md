@@ -104,12 +104,34 @@ python control_station.py
 On Ubuntu, use `python3` in an activated virtual environment. For ROV mode,
 install the full `requirements.txt` dependencies as described below.
 
-Rover mode currently provides navigation, camera/perception and health panels,
-plus locally saved ROS topic settings with separate Simulation and Hardware
-profiles. It does **not** connect to ROS, receive telemetry, stream cameras or
-send movement commands yet. Motion and stop buttons are disabled. The next
-integration is a rover communication backend with command ownership and stop
-acknowledgement before enabling driving.
+Rover mode uses the ROV's layout and shared visual components: top connection
+and safety bar, left manual controls, centre vehicle/sensor tabs, right settings
+and bottom log. It includes a rover schematic, four drive motors, four steering
+motors, eight encoder rows, a camera view, PS4 monitor and optional STL viewer
+(requires VTK). Simulation and Hardware profiles keep separate ROS topic settings.
+The updated eight-motor layout follows the requested rover hardware; it does not
+change the older skid-steer model or controllers in `Autonmous_Ws`.
+
+| Wheel | Drive / encoder | Steering / encoder |
+| :-- | :-- | :-- |
+| Front left | D1 / E1 | S1 / E5 |
+| Front right | D2 / E2 | S2 / E6 |
+| Rear left | D3 / E3 | S3 / E7 |
+| Rear right | D4 / E4 | S4 / E8 |
+
+Encoder rows show raw ticks, drive RPM or steering angle, and data freshness.
+Missing readings show `--`; readings older than two seconds are marked stale.
+An eventual backend can call `RoverDashboard.update_encoder(motor, ticks, value)`
+on the GUI thread: motor IDs are `D_FL`, `D_FR`, `D_RL`, `D_RR`, `S_FL`, `S_FR`,
+`S_RL`, `S_RR`; values are measured RPM for drive or degrees for steering.
+No ticks-to-angle conversion is guessed without encoder calibration.
+
+The dashboard does **not** connect to ROS, poll a gamepad, receive hardware
+telemetry, stream cameras or send movement commands yet. Motion, arm and stop
+buttons are disabled. The camera button switches the centre view to an offline
+camera placeholder. Local drive limits and joystick preferences are saved but
+not applied to hardware. Live integration needs the actual encoder topic or
+packet format, command ownership and stop acknowledgement before driving.
 
 ROV mode launches the original application in a separate process using the
 same Python environment. Closing either vehicle window returns to the selector.
